@@ -1,19 +1,5 @@
 version: '3.8'
 
-networks:
-  mailcow-network:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.22.1.0/24
-
-volumes:
-  mysql-vol-1:
-  mysql-socket-vol-1:
-  redis-vol-1:
-  clamd-db-vol-1:
-  rspamd-vol-1:
-
 services:
 
   unbound-mailcow:
@@ -39,7 +25,7 @@ services:
     stop_grace_period: 45s
     volumes:
       - mysql-vol-1:/var/lib/mysql/
-      - mysql-socket-vol-1:/var/run/mysqld/:z
+      - mysql-socket-vol-1:/var/run/mysqld/:Z
       - ./data/conf/mysql/:/etc/mysql/conf.d/:ro,Z
     environment:
       - TZ=${TZ}
@@ -61,7 +47,7 @@ services:
     entrypoint: ["/bin/sh","/redis-conf.sh"]
     volumes:
       - redis-vol-1:/data/
-      - ./data/conf/redis/redis-conf.sh:/redis-conf.sh:z
+      - ./data/conf/redis/redis-conf.sh:/redis-conf.sh:Z
     restart: always
     depends_on:
       - unbound-mailcow
@@ -98,6 +84,30 @@ services:
         aliases:
           - clamd
 
+  dovecot-mailcow:
+    image: ghcr.io/mailcow/dovecot:2.7
+    restart: always
+    depends_on:
+      - mysql-mailcow
+      - redis-mailcow
+    environment:
+      - TZ=${TZ}
+      - DBNAME=${DBNAME}
+      - DBUSER=${DBUSER}
+      - DBPASS=${DBPASS}
+      - MAILCOW_HOSTNAME=${MAILCOW_HOSTNAME}
+      - REDISPASS=${REDISPASS}
+    volumes:
+      - ./data/conf/dovecot/:/etc/dovecot/:Z
+      - ./data/conf/dovecot/auth/:/etc/dovecot/auth/:Z
+      - ./data/conf/dovecot/global_sieve_before:/global_sieve/before:Z
+      - ./data/conf/dovecot/global_sieve_after:/global_sieve/after:Z
+      - ./data/web:/web:Z
+    networks:
+      mailcow-network:
+        aliases:
+          - dovecot
+
   rspamd-mailcow:
     image: ghcr.io/mailcow/rspamd:2.4
     stop_grace_period: 30s
@@ -111,7 +121,7 @@ services:
       - SPAMHAUS_DQS_KEY=${SPAMHAUS_DQS_KEY:-}
     volumes:
       - ./data/hooks/rspamd:/hooks:Z
-      - ./data/conf/rspamd/custom/:/etc/rspamd/custom:z
+      - ./data/conf/rspamd/custom/:/etc/rspamd/custom:Z
       - ./data/conf/rspamd/override.d/:/etc/rspamd/override.d:Z
       - ./data/conf/rspamd/local.d/:/etc/rspamd/local.d:Z
       - ./data/conf/rspamd/plugins.d/:/etc/rspamd/plugins.d:Z
@@ -135,30 +145,30 @@ services:
       - redis-mailcow
     volumes:
       - ./data/hooks/phpfpm:/hooks:Z
-      - ./data/web:/web:z
-      - ./data/conf/rspamd/dynmaps:/dynmaps:ro,z
-      - ./data/conf/rspamd/custom/:/rspamd_custom_maps:z
-      - ./data/conf/dovecot/auth/mailcowauth.php:/mailcowauth/mailcowauth.php:z
-      - ./data/web/inc/functions.inc.php:/mailcowauth/functions.inc.php:z
-      - ./data/web/inc/functions.auth.inc.php:/mailcowauth/functions.auth.inc.php:z
-      - ./data/web/inc/sessions.inc.php:/mailcowauth/sessions.inc.php:z
-      - ./data/web/inc/functions.mailbox.inc.php:/mailcowauth/functions.mailbox.inc.php:z
-      - ./data/web/inc/functions.ratelimit.inc.php:/mailcowauth/functions.ratelimit.inc.php:z
-      - ./data/web/inc/functions.acl.inc.php:/mailcowauth/functions.acl.inc.php:z
+      - ./data/web:/web:Z
+      - ./data/conf/rspamd/dynmaps:/dynmaps:ro,Z
+      - ./data/conf/rspamd/custom/:/rspamd_custom_maps:Z
+      - ./data/conf/dovecot/auth/mailcowauth.php:/mailcowauth/mailcowauth.php:Z
+      - ./data/web/inc/functions.inc.php:/mailcowauth/functions.inc.php:Z
+      - ./data/web/inc/functions.auth.inc.php:/mailcowauth/functions.auth.inc.php:Z
+      - ./data/web/inc/sessions.inc.php:/mailcowauth/sessions.inc.php:Z
+      - ./data/web/inc/functions.mailbox.inc.php:/mailcowauth/functions.mailbox.inc.php:Z
+      - ./data/web/inc/functions.ratelimit.inc.php:/mailcowauth/functions.ratelimit.inc.php:Z
+      - ./data/web/inc/functions.acl.inc.php:/mailcowauth/functions.acl.inc.php:Z
       - rspamd-vol-1:/var/lib/rspamd
-      - mysql-socket-vol-1:/var/run/mysqld/:z
-      - ./data/conf/sogo/:/etc/sogo/:z
-      - ./data/conf/rspamd/meta_exporter:/meta_exporter:ro,z
-      - ./data/conf/phpfpm/crons:/crons:z
-      - ./data/conf/phpfpm/sogo-sso/:/etc/sogo-sso/:z
+      - mysql-socket-vol-1:/var/run/mysqld/:Z
+      - ./data/conf/sogo/:/etc/sogo/:Z
+      - ./data/conf/rspamd/meta_exporter:/meta_exporter:ro,Z
+      - ./data/conf/phpfpm/crons:/crons:Z
+      - ./data/conf/phpfpm/sogo-sso/:/etc/sogo-sso/:Z
       - ./data/conf/phpfpm/php-fpm.d/pools.conf:/usr/local/etc/php-fpm.d/z-pools.conf:Z
       - ./data/conf/phpfpm/php-conf.d/opcache-recommended.ini:/usr/local/etc/php/conf.d/opcache-recommended.ini:Z
       - ./data/conf/phpfpm/php-conf.d/upload.ini:/usr/local/etc/php/conf.d/upload.ini:Z
       - ./data/conf/phpfpm/php-conf.d/other.ini:/usr/local/etc/php/conf.d/zzz-other.ini:Z
-      - ./data/conf/dovecot/global_sieve_before:/global_sieve/before:z
-      - ./data/conf/dovecot/global_sieve_after:/global_sieve/after:z
-      - ./data/assets/templates:/tpls:z
-      - ./data/conf/nginx/:/etc/nginx/conf.d/:z
+      - ./data/conf/dovecot/global_sieve_before:/global_sieve/before:Z
+      - ./data/conf/dovecot/global_sieve_after:/global_sieve/after:Z
+      - ./data/assets/templates:/tpls:Z
+      - ./data/conf/nginx/:/etc/nginx/conf.d/:Z
     dns:
       - ${IPV4_NETWORK:-172.22.1}.254
     environment:
@@ -190,16 +200,30 @@ services:
       - ${IPV4_NETWORK:-172.22.1}.254
     volumes:
       - ./data/hooks/sogo:/hooks:Z
-      - ./data/conf/sogo/:/etc/sogo/:z
-      - ./data/web/inc/init_db.inc.php:/init_db.inc.php:z
-      - ./data/conf/sogo/custom-favicon.ico:/usr/lib/GNUstep/SOGo/WebServerResources/img/sogo.ico:z
-      - ./data/conf/sogo/custom-shortlogo.svg:/usr/lib/GNUstep/SOGo/WebServerResources/img/sogo-compact.svg:z
-      - ./data/conf/sogo/custom-fulllogo.svg:/usr/lib/GNUstep/SOGo/WebServerResources/img/sogo-full.svg:z
-      - ./data/conf/sogo/custom-fulllogo.png:/usr/lib/GNUstep/SOGo/WebServerResources/img/sogo-logo.png:z
-      - ./data/conf/sogo/custom-theme.js:/usr/lib/GNUstep/SOGo/WebServerResources/js/theme.js:z
-      - ./data/conf/sogo/custom-sogo.js:/usr/lib/GNUstep/SOGo/WebServerResources/js/custom-sogo.js:z
+      - ./data/conf/sogo/:/etc/sogo/:Z
+      - ./data/web/inc/init_db.inc.php:/init_db.inc.php:Z
+      - ./data/conf/sogo/custom-favicon.ico:/usr/lib/GNUstep/SOGo/WebServerResources/img/sogo.ico:Z
+      - ./data/conf/sogo/custom-shortlogo.svg:/usr/lib/GNUstep/SOGo/WebServerResources/img/sogo-compact.svg:Z
+      - ./data/conf/sogo/custom-fulllogo.svg:/usr/lib/GNUstep/SOGo/WebServerResources/img/sogo-full.svg:Z
+      - ./data/conf/sogo/custom-fulllogo.png:/usr/lib/GNUstep/SOGo/WebServerResources/img/sogo-logo.png:Z
+      - ./data/conf/sogo/custom-theme.js:/usr/lib/GNUstep/SOGo/WebServerResources/js/theme.js:Z
+      - ./data/conf/sogo/custom-sogo.js:/usr/lib/GNUstep/SOGo/WebServerResources/js/custom-sogo.js:Z
     restart: always
     networks:
       mailcow-network:
         aliases:
           - sogo
+
+volumes:
+  mysql-vol-1:
+  mysql-socket-vol-1:
+  redis-vol-1:
+  clamd-db-vol-1:
+  rspamd-vol-1:
+
+networks:
+  mailcow-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: ${IPV4_NETWORK:-172.22.1}.0/24
