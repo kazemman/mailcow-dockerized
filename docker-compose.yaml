@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
 
   unbound-mailcow:
@@ -119,11 +121,42 @@ services:
     depends_on:
       - redis-mailcow
     volumes:
-      # (all your volumes remain unchanged)
+      - ./data/hooks/phpfpm:/hooks:Z
+      - ./data/web:/web:z
+      - ./data/conf/rspamd/dynmaps:/dynmaps:ro,z
+      - ./data/conf/rspamd/custom/:/rspamd_custom_maps:z
+      - ./data/conf/dovecot/auth/mailcowauth.php:/mailcowauth/mailcowauth.php:z
+      - ./data/web/inc/functions.inc.php:/mailcowauth/functions.inc.php:z
+      - ./data/web/inc/functions.auth.inc.php:/mailcowauth/functions.auth.inc.php:z
+      - ./data/web/inc/sessions.inc.php:/mailcowauth/sessions.inc.php:z
+      - ./data/web/inc/functions.mailbox.inc.php:/mailcowauth/functions.mailbox.inc.php:z
+      - ./data/web/inc/functions.ratelimit.inc.php:/mailcowauth/functions.ratelimit.inc.php:z
+      - ./data/web/inc/functions.acl.inc.php:/mailcowauth/functions.acl.inc.php:z
+      - rspamd-vol-1:/var/lib/rspamd
+      - mysql-socket-vol-1:/var/run/mysqld/:z
+      - ./data/conf/sogo/:/etc/sogo/:z
+      - ./data/conf/rspamd/meta_exporter:/meta_exporter:ro,z
+      - ./data/conf/phpfpm/crons:/crons:z
+      - ./data/conf/phpfpm/sogo-sso/:/etc/sogo-sso/:z
+      - ./data/conf/phpfpm/php-fpm.d/pools.conf:/usr/local/etc/php-fpm.d/z-pools.conf:Z
+      - ./data/conf/phpfpm/php-conf.d/opcache-recommended.ini:/usr/local/etc/php/conf.d/opcache-recommended.ini:Z
+      - ./data/conf/phpfpm/php-conf.d/upload.ini:/usr/local/etc/php/conf.d/upload.ini:Z
+      - ./data/conf/phpfpm/php-conf.d/other.ini:/usr/local/etc/php/conf.d/zzz-other.ini:Z
+      - ./data/conf/dovecot/global_sieve_before:/global_sieve/before:z
+      - ./data/conf/dovecot/global_sieve_after:/global_sieve/after:z
+      - ./data/assets/templates:/tpls:z
+      - ./data/conf/nginx/:/etc/nginx/conf.d/:z
     dns:
       - ${IPV4_NETWORK:-172.22.1}.254
     environment:
-      # (all your env vars remain unchanged)
+      - TZ=${TZ}
+      - DBNAME=${DBNAME}
+      - DBUSER=${DBUSER}
+      - DBPASS=${DBPASS}
+      - MAILCOW_HOSTNAME=${MAILCOW_HOSTNAME}
+      - REDISPASS=${REDISPASS}
+      - MAILDIR_SUB=${MAILDIR_SUB:-yes}
+      - ALLOW_ADMIN_EMAIL_LOGIN=${ALLOW_ADMIN_EMAIL_LOGIN:-n}
     restart: always
     networks:
       mailcow-network:
@@ -133,34 +166,41 @@ services:
   sogo-mailcow:
     image: ghcr.io/mailcow/sogo:1.136
     environment:
-      # (all your env vars remain unchanged)
+      - TZ=${TZ}
+      - DBNAME=${DBNAME}
+      - DBUSER=${DBUSER}
+      - DBPASS=${DBPASS}
+      - MAILCOW_HOSTNAME=${MAILCOW_HOSTNAME}
+      - REDISPASS=${REDISPASS}
+      - ALLOW_ADMIN_EMAIL_LOGIN=${ALLOW_ADMIN_EMAIL_LOGIN:-n}
     dns:
       - ${IPV4_NETWORK:-172.22.1}.254
     volumes:
-      # (all your volumes remain unchanged)
+      - ./data/hooks/sogo:/hooks:Z
+      - ./data/conf/sogo/:/etc/sogo/:z
+      - ./data/web/inc/init_db.inc.php:/init_db.inc.php:z
+      - ./data/conf/sogo/custom-favicon.ico:/usr/lib/GNUstep/SOGo/WebServerResources/img/sogo.ico:z
+      - ./data/conf/sogo/custom-shortlogo.svg:/usr/lib/GNUstep/SOGo/WebServerResources/img/sogo-compact.svg:z
+      - ./data/conf/sogo/custom-fulllogo.svg:/usr/lib/GNUstep/SOGo/WebServerResources/img/sogo-full.svg:z
+      - ./data/conf/sogo/custom-fulllogo.png:/usr/lib/GNUstep/SOGo/WebServerResources/img/sogo-logo.png:z
+      - ./data/conf/sogo/custom-theme.js:/usr/lib/GNUstep/SOGo/WebServerResources/js/theme.js:z
+      - ./data/conf/sogo/custom-sogo.js:/usr/lib/GNUstep/SOGo/WebServerResources/js/custom-sogo.js:z
     restart: always
     networks:
       mailcow-network:
         aliases:
           - sogo
 
-# --------------------
-# Volumes
+networks:
+  mailcow-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: ${IPV4_NETWORK:-172.22.1}.0/24
+
 volumes:
   mysql-vol-1:
   mysql-socket-vol-1:
   redis-vol-1:
   clamd-db-vol-1:
   rspamd-vol-1:
-
-# --------------------
-# Network
-networks:
-  mailcow-network:
-    driver: bridge
-    enable_ipv6: true
-    ipam:
-      driver: default
-      config:
-        - subnet: 172.22.1.0/24
-        - subnet: fd4d:6169:6c63:6f77::/64
